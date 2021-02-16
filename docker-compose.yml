@@ -1,0 +1,43 @@
+version: '2.1'
+
+services:
+  # Centralized Configuration service (for Apache products)
+  poc-zookeeper:
+    image: wurstmeister/zookeeper
+    hostname: poc-zookeeper
+    ports:
+      - 2181:2181
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  # Distributed Streaming service
+  poc-kafka:
+    image: wurstmeister/kafka
+    hostname: poc-kafka
+    command: [start-kafka.sh]
+    ports:
+      - 9092:9092
+    links:
+      - poc-zookeeper:zk
+    environment:
+      KAFKA_LISTENERS: "INTERNAL://:29092,EXTERNAL://:9092"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://poc-kafka:29092,EXTERNAL://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT: poc-zookeeper:2181
+    depends_on:
+      - poc-zookeeper
+
+  # UI for Kafka
+  poc-kafdrop-ui:
+    image: obsidiandynamics/kafdrop
+    restart: "no"
+    ports:
+      - 9000:9000
+    environment:
+      KAFKA_BROKERCONNECT: "poc-kafka:29092"
+      JVM_OPTS: "-Xms16M -Xmx48M -Xss180K -XX:-TieredCompilation -XX:+UseStringDeduplication -noverify"
+    depends_on:
+      - poc-kafka
